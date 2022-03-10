@@ -8,8 +8,7 @@ from typing import Tuple, Union
 
 
 # torch_xla.distributed.xla_sharding
-def mark_sharding(t: Union[torch.Tensor,
-                           XLAShardedTensor], mesh_shape: Tuple[int],
+def mark_sharding(t: torch.Tensor, mesh_shape: Tuple[int],
                   partition_spec: Tuple[Union[int, None]]) -> XLAShardedTensor:
   """
     Annotates the tensor provided with XLA partition spec. Internally,
