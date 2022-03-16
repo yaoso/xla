@@ -1466,6 +1466,8 @@ class XLATensor : public c10::intrusive_ptr_target {
   bool ShouldSyncIrNode();
 
   std::shared_ptr<Data> data_;
+
+  std::shared_ptr<ShardingSpec> sharding_spec_;
 };
 
 using XLATensorPtr = c10::intrusive_ptr<XLATensor>;
