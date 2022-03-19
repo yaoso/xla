@@ -1542,7 +1542,8 @@
           pass.AddPass<xla::HloVerifier>(/*layout_sensitive=*/false,
                                          /*allow_mixed_precision=*/false);
           pass.AddPass<xla::spmd::SpmdPartitioner>(
-              num_devices, /*num_replicas=*/1, options, collective_ops_creator);
+              num_devices, /*num_replicas=*/num_replicas, options,
+              collective_ops_creator);
           pass.AddPass<xla::HloVerifier>(/*layout_sensitive=*/false,
                                          /*allow_mixed_precision=*/false);
           pass.Run(module.get());
