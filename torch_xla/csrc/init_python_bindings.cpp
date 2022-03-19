@@ -1523,9 +1523,9 @@
           config.set_replica_count(num_replicas);
           config.set_num_partitions(num_devices);
 
-          absl::string_view hlo_text = GetTensorsHloGraph(tensors);
+          auto hlo_text = GetTensorsHloGraph(tensors);
           auto hlo_module_error =
-              xla::ParseAndReturnUnverifiedModule(hlo_text, config);
+              xla::ParseAndReturnUnverifiedModule(hlo_text);  // TODO: config
           if (!hlo_module_error.ok()) {
             LOG(ERROR) << "HLO Module loading failed: "
                        << hlo_module_error.status();
@@ -1544,6 +1544,7 @@
           pass.AddPass<xla::spmd::SpmdPartitioner>(
               num_devices, /*num_replicas=*/num_replicas, options,
               collective_ops_creator);
+          // TODO: propagate
           pass.AddPass<xla::HloVerifier>(/*layout_sensitive=*/false,
                                          /*allow_mixed_precision=*/false);
           pass.Run(module.get());
