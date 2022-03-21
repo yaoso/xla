@@ -17,7 +17,8 @@
 #include "tensorflow/compiler/xla/service/hlo_verifier.h"
 <<<<<<< HEAD
 #include "tensorflow/compiler/xla/service/sharding_propagation.h"
-    =======
+    == == ==
+    =
 >>>>>>> 3482743c (Add testing probe for partitioner)
 #include "tensorflow/compiler/xla/service/spmd/spmd_partitioner.h"
 #include "tensorflow/compiler/xla/xla_client/computation_client.h"
@@ -58,7 +59,7 @@
 #include "torch_xla/csrc/xla_backend_impl.h"
 #include "torch_xla/csrc/xla_op_builder.h"
 
-    namespace torch_xla {
+        namespace torch_xla {
   namespace {
 
   struct NoGilSection {
@@ -1524,8 +1525,9 @@
           config.set_num_partitions(num_devices);
 
           auto hlo_text = GetTensorsHloGraph(tensors);
-          auto hlo_module_error =
-              xla::ParseAndReturnUnverifiedModule(hlo_text);  // TODO: config
+          // TODO: verify: Instead of HloModule config, I used SpmdPartitioning
+          // pass to take care of the same settings.
+          auto hlo_module_error = xla::ParseAndReturnUnverifiedModule(hlo_text);
           if (!hlo_module_error.ok()) {
             LOG(ERROR) << "HLO Module loading failed: "
                        << hlo_module_error.status();
@@ -1533,7 +1535,6 @@
           }
           auto module = std::move(hlo_module_error.ValueOrDie());
 
-          // Run SPMDPartitioner
           auto collective_ops_creator =
               xla::spmd::GetDefaultCollectiveOpsCreator(
                   num_devices, /*num_replicas=*/num_replicas);
@@ -1544,7 +1545,7 @@
           pass.AddPass<xla::spmd::SpmdPartitioner>(
               num_devices, /*num_replicas=*/num_replicas, options,
               collective_ops_creator);
-          // TODO: propagate
+          // TODO: propagation, but may be skipped.
           pass.AddPass<xla::HloVerifier>(/*layout_sensitive=*/false,
                                          /*allow_mixed_precision=*/false);
           pass.Run(module.get());
