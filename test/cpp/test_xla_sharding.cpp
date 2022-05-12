@@ -55,6 +55,7 @@ TEST_F(XLAShardingTest, TestSPMDPartitioner) {
   auto module = absl::make_unique<HloModule>("TestSPMDPartitioner", config);
   auto parser = HloParser::CreateHloParserForTests(hlo_text);
   parser->run(module);
+<<<<<<< HEAD
 =======
   const int64_t replica_count_ = 8;
 
@@ -77,6 +78,8 @@ TEST_F(XLAShardingTest, TestSPMDPartitioner) {
       )";
   // Run SPMDPartitioner
 >>>>>>> e211ec20 (Update sharding spec to support full replication & mesh sharding)
+=======
+>>>>>>> 4ee1ece0 (CreateXrtSpmdComputation only if spmd is enalbed in HloModule)
 }
 
 }  // namespace cpp_test
