@@ -11,6 +11,10 @@ full_codegen:
   - cos
   - cosh
   - maximum
+  - logical_and
+  - logical_not
+  - logical_or
+  - logical_xor
   - sgn
   - sign
   - sin
@@ -176,10 +180,6 @@ supported:
   - log_sigmoid_backward
   - log_sigmoid_forward
   - logdet
-  - logical_and
-  - logical_not
-  - logical_or
-  - logical_xor
   - logsumexp
   - lt.Scalar
   - lt.Tensor
