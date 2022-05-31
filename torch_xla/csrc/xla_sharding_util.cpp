@@ -26,7 +26,6 @@ void ShardingUtil::SetHloSharding(LoweringContext* lowering_ctx) {
     const XlaNode* xla_node = dynamic_cast<const XlaNode*>(node);
     auto instruction = XlaBuilderFriend::GetInstruction(elem.second);
     if (xla_node->GetSharding() != nullptr) {
-      //*instruction->mutable_sharding() = *xla_node->GetSharding();
       {
         // Annotate the full-shape input with the sharding.
         xla::XlaScopedShardingAssignment assign_sharding(
@@ -74,18 +73,15 @@ xla::HloModuleProto ShardingUtil::SpmdPartitioningPass(
   pass.AddPass<xla::HloVerifier>(/*layout_sensitive=*/false,
                                  /*allow_mixed_precision=*/false);
   // TODO(yeounoh) side-effecting ops gets assigned replicated sharding.
-  // pass.AddPass<xla::ShardingPropagation>(
-  //     /*is_spmd=*/true, /*propagate_metadata=*/false,
-  //     /*allow_spmd_sharding_propagation_to_output=*/true);
-  // pass.AddPass<xla::spmd::SpmdPartitioner>(/*num_partitions=*/num_partitions,
-  //                                          /*num_replicas=*/num_replicas,
-  //                                          options,
-  //                                          xla::spmd::GetDefaultCollectiveOpsCreator(/*num_partitions=*/num_partitions,
-  //                                          /*num_replicas=*/num_replicas));
-  pass.AddPass<xla::ShardingPropagation>(/*is_spmd=*/true);
-  pass.AddPass<xla::spmd::SpmdPartitioner>(/*num_partitions=*/num_partitions,
-                                           /*num_replicas=*/num_replicas,
-                                           options);
+  pass.AddPass<xla::ShardingPropagation>(
+      /*is_spmd=*/true, /*propagate_metadata=*/false,
+      /*allow_spmd_sharding_propagation_to_output=*/true);
+  pass.AddPass<xla::spmd::SpmdPartitioner>(
+      /*num_partitions=*/num_partitions,
+      /*num_replicas=*/num_replicas, options,
+      xla::spmd::GetDefaultCollectiveOpsCreator(
+          /*num_partitions=*/num_partitions,
+          /*num_replicas=*/num_replicas));
   pass.AddPass<xla::HloVerifier>(/*layout_sensitive=*/false,
                                  /*allow_mixed_precision=*/false);
   pass.Run(module.get());

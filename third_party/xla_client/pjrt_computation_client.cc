@@ -122,9 +122,8 @@ std::vector<ComputationClient::ComputationPtr> PjRtComputationClient::Compile(
     // instead of maintaining a different set of compile_options within.
     xla::CompileOptions compile_options;
 
-    auto& module_proto = instance.computation.proto();
-    if (module_proto.has_spmd_output_sharding() ||
-        module_proto.spmd_parameters_shardings_size() > 0) {
+    // TODO(yeounoh) temporary test flag; will replace with a sharding cheker.
+    if (sys_util::GetEnvString(env::kEnvSpmdTest, "0") == "1") {
       // If SPMD is enabled, then we assign multi-cores to a single replica;
       // otherwise, all cores participate in replication.
       compile_options.executable_build_options.set_use_spmd_partitioning(true);
@@ -151,6 +150,14 @@ std::vector<ComputationClient::ComputationPtr> PjRtComputationClient::Compile(
         std::make_shared<PjRtComputation>(std::move(instance.computation),
                                           program_shape, instance.devices,
                                           std::move(executable));
+
+    // TODO(yeounoh) verify HLO modules
+    // std::vector<std::shared_ptr<HloModule>>
+    const auto& hlo_modules = executable->GetHloModules().ValueOrDie();
+    for (auto& module : hlo_modules) {
+      std::cout << "module name:" << module->name() << std::endl;
+      std::cout << module->ToString() << std::endl;
+    }
 
     computations.push_back(pjrt_computation);
   }
