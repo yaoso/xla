@@ -79,9 +79,6 @@ std::vector<ComputationClient::DataPtr> PjRtComputationClient::TransferToServer(
   std::vector<ComputationClient::DataPtr> datas;
   datas.reserve(tensors.size());
   for (auto& tensor : tensors) {
-    std::cout << "TransferToServer -> tensor.shape: " << tensor.shape
-              << std::endl;
-
     xla::Literal literal(tensor.shape);
     tensor.populate_fn(tensor, literal.untyped_data(), literal.size_bytes());
 
@@ -122,7 +119,7 @@ std::vector<ComputationClient::ComputationPtr> PjRtComputationClient::Compile(
     // instead of maintaining a different set of compile_options within.
     xla::CompileOptions compile_options;
 
-    // TODO(yeounoh) temporary test flag; will replace with a sharding cheker.
+    // TODO(yeounoh) temporary test flag; replace with a cheker.
     if (sys_util::GetEnvString(env::kEnvSpmdTest, "0") == "1") {
       // If SPMD is enabled, then we assign multi-cores to a single replica;
       // otherwise, all cores participate in replication.
@@ -130,7 +127,6 @@ std::vector<ComputationClient::ComputationPtr> PjRtComputationClient::Compile(
       compile_options.executable_build_options.set_num_partitions(
           client_->device_count());
       compile_options.executable_build_options.set_num_replicas(1);
-
       std::cout << "Testing SPMD flag in PJRT Compile()" << std::endl;
     } else {
       // TODO(wcromar): set compile_options.argument_layouts, enable strict
@@ -146,18 +142,11 @@ std::vector<ComputationClient::ComputationPtr> PjRtComputationClient::Compile(
 
     std::unique_ptr<xla::PjRtExecutable> executable =
         client_->Compile(instance.computation, compile_options).ValueOrDie();
+
     std::shared_ptr<PjRtComputation> pjrt_computation =
         std::make_shared<PjRtComputation>(std::move(instance.computation),
                                           program_shape, instance.devices,
                                           std::move(executable));
-
-    // TODO(yeounoh) verify HLO modules
-    // std::vector<std::shared_ptr<HloModule>>
-    const auto& hlo_modules = executable->GetHloModules().ValueOrDie();
-    for (auto& module : hlo_modules) {
-      std::cout << "module name:" << module->name() << std::endl;
-      std::cout << module->ToString() << std::endl;
-    }
 
     computations.push_back(pjrt_computation);
   }

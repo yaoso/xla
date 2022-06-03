@@ -26,15 +26,7 @@ void ShardingUtil::SetHloSharding(LoweringContext* lowering_ctx) {
     const XlaNode* xla_node = dynamic_cast<const XlaNode*>(node);
     auto instruction = XlaBuilderFriend::GetInstruction(elem.second);
     if (xla_node->GetSharding() != nullptr) {
-      {
-        // Annotate the full-shape input with the sharding.
-        xla::XlaScopedShardingAssignment assign_sharding(
-            lowering_ctx->builder(), *xla_node->GetSharding());
-        xla::CustomCall(lowering_ctx->builder(),
-                        /*call_target_name=*/"Sharding",
-                        xla_node->Lower(lowering_ctx), xla_node->xla_shape(),
-                        /*opaque=*/"");
-      }
+      *instruction->mutable_sharding() = *xla_node->GetSharding();
     }
   }
 }
