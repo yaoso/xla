@@ -1408,6 +1408,13 @@ void InitXlaModuleBindings(py::module m) {
     }
 
     XLATensor xtensor = bridge::GetXlaTensor(input);
+    // Assign an IR node representing this tensor if not already present,
+    // which could be the case if the tensor is created but never touched, yet.
+    xtensor.GetIrValue();
+    XLA_CHECK(xtensor.GetIrValue())
+        << "XLATensor is yet to be assigned an IR node.";
+    XLA_CHECK(xtensor.CurrentIrValue().node != nullptr)
+        << "IR value node is null.";
     xtensor.SetShardingSpec(sharding, replicated, manual);
   });
   m.def("_xla_clear_sharding", [](const at::Tensor& input) {

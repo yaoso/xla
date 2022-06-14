@@ -634,13 +634,12 @@ void XLATensor::SetShardingSpec(const xla::OpSharding& sharding,
   auto new_sharding_spec =
       std::make_shared<ShardingSpec>(sharding, replicated, manual);
   data()->sharding_spec = new_sharding_spec;
-  XLA_CHECK(data()->ir_value.node != nullptr)
-      << "Tyring to access a null cursor";
+  XLA_CHECK(GetIrValue().node != nullptr) << "Tyring to access a null cursor";
   dynamic_cast<XlaNode*>(data()->ir_value.node.get())
       ->SetSharding(&new_sharding_spec->sharding);
 }
 void XLATensor::ClearShardingSpec() {
-  if (data()->ir_value.node != nullptr) {
+  if (GetIrValue().node != nullptr) {
     dynamic_cast<XlaNode*>(data()->ir_value.node.get())->ClearSharding();
   }
   data()->sharding_spec = nullptr;

@@ -34,6 +34,12 @@ class PjRtComputationClient : public ComputationClient {
       const std::string& device,
       const ExecuteComputationOptions& options) override;
 
+  std::vector<std::vector<DataPtr>> ExecuteReplicated(
+      const Computation& computation,
+      const std::vector<std::vector<DataPtr>>& arguments,
+      absl::Span<const std::string> devices,
+      const ExecuteReplicatedOptions& options) override;
+
   size_t GetNumDevices() const override;
 
   std::string GetDefaultDevice() const override;
@@ -68,14 +74,6 @@ class PjRtComputationClient : public ComputationClient {
 
   std::vector<std::vector<DataPtr>> DeconstructTuple(
       absl::Span<const DataPtr> tuples) override {
-    XLA_ERROR() << __FUNCTION__ << " not implemented";
-  };
-
-  std::vector<std::vector<DataPtr>> ExecuteReplicated(
-      const Computation& computation,
-      const std::vector<std::vector<DataPtr>>& arguments,
-      absl::Span<const std::string> devices,
-      const ExecuteReplicatedOptions& options) override {
     XLA_ERROR() << __FUNCTION__ << " not implemented";
   };
 
