@@ -167,32 +167,30 @@ PjRtComputationClient::ExecuteComputation(
     const ComputationClient::Computation& computation,
     absl::Span<const ComputationClient::DataPtr> arguments,
     const std::string& device, const ExecuteComputationOptions& options) {
+  xla::ExecuteOptions execute_options;
+  execute_options.untuple_result = options.explode_tuple;
+  execute_options.strict_shape_checking = false;
+
   const PjRtComputation& pjrt_computation =
       dynamic_cast<const PjRtComputation&>(computation);
 
   // TODO(yeounoh) temporary test flag; replace with a cheker.
   if (sys_util::GetEnvString(env::kEnvSpmdTest, "0") == "1") {
-    ExecuteReplicatedOptions execute_options;
+    TF_VLOG(1)
+        << "Executing PjRt computation on all devices in replication mode.";
+
+    execute_options.strict_shape_checking = true;
+    execute_options.multi_slice_config = nullptr;  // run on single-slice
 
     std::vector<std::string> devices = GetAllDevices();
-    std::vector<std::vector<ComputationClient::DataPtr>> replicated_arguments(
-        devices.size());
-    // TODO(yeounoh) redistribute to different devices
-    std::fill(replicated_arguments.begin(), replicated_arguments.end(),
-              &arguments);
 
-    // // The computation output is replicated across devices
-    // std::vector<std::vector<DataPtr>> datas = ExecuteReplicated(
-    //     computation, replicated_arguments, devices, execute_options);
-    // return datas[0];
-
-    absl::Span<const std::vector<PjRtBuffer*>> argument_handles;
-    for (int32_t i = 0; i < replicated_arguments.size(); ++i) {
-      xla::PjRtDevice* pjrt_device = StringToPjRtDevice(devices[i]);
+    std::vector<std::vector<PjRtBuffer*>> argument_handles;
+    for (auto& device : devices) {
+      xla::PjRtDevice* pjrt_device = StringToPjRtDevice(device);
       XLA_CHECK(pjrt_device->IsAddressable()) << pjrt_device->DebugString();
 
-      std::vector<xla::PjRtBuffer*> buffers;
-      for (auto& argument : replicated_arguments[i]) {
+      std::vector<PjRtBuffer*> buffers;
+      for (auto& argument : arguments) {
         const PjRtData* pjrt_data = dynamic_cast<PjRtData*>(argument.get());
 
         XLA_CHECK(pjrt_device == pjrt_data->buffer->device())
@@ -202,11 +200,6 @@ PjRtComputationClient::ExecuteComputation(
       }
       argument_handles.push_back(buffers);
     }
-
-    xla::ExecuteOptions execute_options;
-    execute_options.untuple_result = options.explode_tuple;
-    execute_options.strict_shape_checking = true;
-    execute_options.multi_slice_config = nullptr;  // run on single-slice
 
     std::vector<std::vector<std::unique_ptr<PjRtBuffer>>> results =
         pjrt_computation.executable->Execute(argument_handles, execute_options)
@@ -229,66 +222,15 @@ PjRtComputationClient::ExecuteComputation(
 
     TF_VLOG(1) << "Returning " << data_handles.size() << " sets of results";
     return data_handles[0];
-  }
+  } else {
+    TF_VLOG(1) << "Executing PjRt computation on " << device;
 
-  TF_VLOG(1) << "Executing PjRt computation on " << device;
-
-  xla::PjRtDevice* pjrt_device = StringToPjRtDevice(device);
-  XLA_CHECK(pjrt_device->IsAddressable()) << pjrt_device->DebugString();
-
-  std::vector<xla::PjRtBuffer*> buffers;
-  buffers.reserve(arguments.size());
-  for (auto& argument : arguments) {
-    const PjRtData* pjrt_data = dynamic_cast<PjRtData*>(argument.get());
-
-    XLA_CHECK(pjrt_device == pjrt_data->buffer->device())
-        << pjrt_device->DebugString() << " vs "
-        << pjrt_data->buffer->device()->DebugString();
-    buffers.push_back(pjrt_data->buffer.get());
-  }
-
-  xla::ExecuteOptions execute_options;
-  execute_options.untuple_result = options.explode_tuple;
-  execute_options.strict_shape_checking = false;
-  std::vector<std::unique_ptr<xla::PjRtBuffer>> results =
-      pjrt_computation.executable
-          ->ExecuteSharded(buffers, pjrt_device, execute_options)
-          .ValueOrDie();
-
-  std::vector<DataPtr> datas;
-  datas.reserve(results.size());
-  for (auto& result : results) {
-    std::unique_ptr<xla::PjRtBuffer> buffer = std::move(result);
-
-    std::shared_ptr<PjRtData> data = std::make_shared<PjRtData>(
-        device, buffer->logical_on_device_shape().ValueOrDie(),
-        std::move(buffer));
-
-    datas.push_back(data);
-  }
-
-  TF_VLOG(1) << "Returning " << datas.size() << " results";
-  return datas;
-}
-
-std::vector<std::vector<ComputationClient::DataPtr>> ExecuteReplicated(
-    const ComputationClient::Computation& computation,
-    const std::vector<std::vector<ComputationClient::DataPtr>>& arguments,
-    absl::Span<const std::string> devices,
-    const ComputationClient::ExecuteReplicatedOptions& options) {
-  TF_VLOG(1)
-      << "Executing PjRt computation on all devices in replication mode.";
-
-  const PjRtComputation& pjrt_computation =
-      dynamic_cast<const PjRtComputation&>(computation);
-
-  absl::Span<const std::vector<PjRtBuffer*>> argument_handles;
-  for (int32_t i = 0; i < arguments.size(); ++i) {
-    xla::PjRtDevice* pjrt_device = StringToPjRtDevice(devices[i]);
+    xla::PjRtDevice* pjrt_device = StringToPjRtDevice(device);
     XLA_CHECK(pjrt_device->IsAddressable()) << pjrt_device->DebugString();
 
     std::vector<xla::PjRtBuffer*> buffers;
-    for (auto& argument : arguments[i].size(); ++j) {
+    buffers.reserve(arguments.size());
+    for (auto& argument : arguments) {
       const PjRtData* pjrt_data = dynamic_cast<PjRtData*>(argument.get());
 
       XLA_CHECK(pjrt_device == pjrt_data->buffer->device())
@@ -296,23 +238,16 @@ std::vector<std::vector<ComputationClient::DataPtr>> ExecuteReplicated(
           << pjrt_data->buffer->device()->DebugString();
       buffers.push_back(pjrt_data->buffer.get());
     }
-    argument_handles.push_back(buffers);
-  }
 
-  xla::ExecuteOptions execute_options;
-  execute_options.untuple_result = options.explode_tuple;
-  execute_options.strict_shape_checking = true;
-  execute_options.multi_slice_config = nullptr;  // run on single-slice
+    std::vector<std::unique_ptr<xla::PjRtBuffer>> results =
+        pjrt_computation.executable
+            ->ExecuteSharded(buffers, pjrt_device, execute_options)
+            .ValueOrDie();
 
-  std::vector<std::vector<std::unique_ptr<PjRtBuffer>>> results =
-      pjrt_computation.executable->Execute(argument_handles, execute_options)
-          .ValueOrDie();
-
-  std::vector<std::vector<DataPtr>> data_handles;
-  for (auto& result : results) {
     std::vector<DataPtr> datas;
-    for (int32_t i = 0; i < result.size(); ++i) {
-      std::unique_ptr<xla::PjRtBuffer> buffer = std::move(result[i]);
+    datas.reserve(results.size());
+    for (auto& result : results) {
+      std::unique_ptr<xla::PjRtBuffer> buffer = std::move(result);
 
       std::shared_ptr<PjRtData> data = std::make_shared<PjRtData>(
           device, buffer->logical_on_device_shape().ValueOrDie(),
@@ -320,11 +255,10 @@ std::vector<std::vector<ComputationClient::DataPtr>> ExecuteReplicated(
 
       datas.push_back(data);
     }
-    data_handles.push_back(datas);
-  }
 
-  TF_VLOG(1) << "Returning " << data_handles.size() << " sets of results";
-  return data_handles;
+    TF_VLOG(1) << "Returning " << datas.size() << " results";
+    return datas;
+  }
 }
 
 size_t PjRtComputationClient::GetNumDevices() const {
