@@ -419,11 +419,12 @@ std::vector<at::Tensor> GetXlaTensorsFromAten(
 }
 
 std::shared_ptr<torch::lazy::Value> CreateToken(const std::string& device_str) {
-  // This should be using xla::CreateToken() once we have added Token support
-  // to XLA AllReduce(). Meanwhile we use a constant as token, and we handle
-  // it accordingly in cross_replica_reduces.cpp. This needs to be device data
-  // (hence coming in as XLA computation parameter) as otherwise the XLA
-  // compiler passes will remove it, vanishing its sequencing effects.
+  // This should be using xla::CreateToken() once we have added Token support to
+  // XLA AllReduce(). Meanwhile we use a constant as token, and we handle it
+  // accordingly in cross_replica_reduces.cpp.
+  // This needs to be device data (hence coming in as XLA computation parameter)
+  // as otherwise the XLA compiler passes will remove it, vanishing its
+  // sequencing effects.
   torch::lazy::BackendDevice device = GetDeviceOrCurrent(device_str);
   torch::lazy::Value ir_value =
       XLATensor::GetDeviceDataIrValue(0.0, xla::PrimitiveType::F32, device);
@@ -665,8 +666,8 @@ py::object XlaNms(const at::Tensor& boxes, const at::Tensor& scores,
     num_valid = bridge::AtenFromXlaTensor(std::move(nms_result.second));
   }
   auto result_tuple = py::tuple(2);
-  result_tuple[0] = torch::autograd::make_variable(selected_indices,
-                                                   /*requires_grad=*/false);
+  result_tuple[0] =
+      torch::autograd::make_variable(selected_indices, /*requires_grad=*/false);
   result_tuple[1] =
       torch::autograd::make_variable(num_valid, /*requires_grad=*/false);
   return result_tuple;
@@ -753,45 +754,45 @@ void BuildProfilerSubmodule(py::module* m) {
   py::class_<xla::profiler::ProfilerServer,
              std::unique_ptr<xla::profiler::ProfilerServer>>
       profiler_server_class(profiler, "ProfilerServer");
-  profiler.def(
-      "start_server",
-      [](int port) -> std::unique_ptr<xla::profiler::ProfilerServer> {
-        auto server = absl::make_unique<xla::profiler::ProfilerServer>();
-        server->Start(port);
-        return server;
-      },
-      py::arg("port"));
+  profiler.def("start_server",
+               [](int port) -> std::unique_ptr<xla::profiler::ProfilerServer> {
+                 auto server =
+                     absl::make_unique<xla::profiler::ProfilerServer>();
+                 server->Start(port);
+                 return server;
+               },
+               py::arg("port"));
 
-  profiler.def(
-      "trace",
-      [](const char* service_addr, const char* logdir, int duration_ms,
-         int num_tracing_attempts, int timeout_s, int interval_s,
-         py::dict options) {
-        absl::flat_hash_map<std::string, absl::variant<int>> opts =
-            ConvertDictToMap(options);
-        std::chrono::seconds sleep_s(interval_s);
-        tensorflow::Status status;
-        {
-          NoGilSection nogil;
-          for (int i = 0; i <= timeout_s / interval_s; i++) {
-            status = tensorflow::profiler::pywrap::Trace(
-                service_addr, logdir, /*worker_list=*/"",
-                /*include_dataset_ops=*/false, duration_ms,
-                num_tracing_attempts, opts);
-            if (status.ok()) {
-              return;
-            }
-            std::this_thread::sleep_for(sleep_s);
-          }
-        }
-        if (!status.ok()) {
-          PyErr_SetString(PyExc_RuntimeError, status.error_message());
-          throw py::error_already_set();
-        }
-      },
-      py::arg("service_addr"), py::arg("logdir"), py::arg("duration_ms") = 1000,
-      py::arg("num_tracing_attempts") = 3, py::arg("timeout_s") = 120,
-      py::arg("interval_s") = 5, py::arg("options"));
+  profiler.def("trace",
+               [](const char* service_addr, const char* logdir, int duration_ms,
+                  int num_tracing_attempts, int timeout_s, int interval_s,
+                  py::dict options) {
+                 absl::flat_hash_map<std::string, absl::variant<int>> opts =
+                     ConvertDictToMap(options);
+                 std::chrono::seconds sleep_s(interval_s);
+                 tensorflow::Status status;
+                 {
+                   NoGilSection nogil;
+                   for (int i = 0; i <= timeout_s / interval_s; i++) {
+                     status = tensorflow::profiler::pywrap::Trace(
+                         service_addr, logdir, /*worker_list=*/"",
+                         /*include_dataset_ops=*/false, duration_ms,
+                         num_tracing_attempts, opts);
+                     if (status.ok()) {
+                       return;
+                     }
+                     std::this_thread::sleep_for(sleep_s);
+                   }
+                 }
+                 if (!status.ok()) {
+                   PyErr_SetString(PyExc_RuntimeError, status.error_message());
+                   throw py::error_already_set();
+                 }
+               },
+               py::arg("service_addr"), py::arg("logdir"),
+               py::arg("duration_ms") = 1000,
+               py::arg("num_tracing_attempts") = 3, py::arg("timeout_s") = 120,
+               py::arg("interval_s") = 5, py::arg("options"));
 
   py::class_<tensorflow::profiler::TraceMeWrapper> traceme_class(
       profiler, "TraceMe", py::module_local());
@@ -868,8 +869,7 @@ void InitXlaModuleBindings(py::module m) {
       result.reserve(xla_tensors.size());
       for (size_t i = 0; i < xla_tensors.size(); ++i) {
         result.push_back(torch::autograd::make_variable(
-            xla_tensors[i],
-            /*requires_grad=*/tensors.at(i).requires_grad()));
+            xla_tensors[i], /*requires_grad=*/tensors.at(i).requires_grad()));
       }
     }
     return result;
@@ -1116,49 +1116,43 @@ void InitXlaModuleBindings(py::module m) {
     return SetCurrentThreadDevice(device);
   });
   m.def("_xla_get_default_device", []() { return GetCurrentThreadDevice(); });
-  m.def(
-      "_xla_set_rng_seed",
-      [](uint64_t seed, const std::string& device) {
-        SetRngSeed(seed, device);
-      },
-      py::arg("seed") = 101, py::arg("device") = "");
-  m.def(
-      "_xla_get_rng_seed",
-      [](const std::string& device) { return GetRngSeed(device); },
-      py::arg("device") = "");
-  m.def(
-      "_xla_sync_multi",
-      [](const std::vector<at::Tensor>& tensors,
-         const std::vector<std::string>& devices, bool wait,
-         bool sync_xla_data) {
-        NoGilSection nogil;
-        SyncTensors(tensors, devices, wait, sync_xla_data);
-      },
-      py::arg("tensors"), py::arg("devices"), py::arg("wait") = true,
-      py::arg("sync_xla_data") = true);
-  m.def(
-      "_xla_sync_live_tensors",
-      [](const std::string& device, const std::vector<std::string>& devices,
-         bool wait) {
-        NoGilSection nogil;
-        SyncLiveTensors(device, devices, wait);
-      },
-      py::arg("device") = "", py::arg("devices"), py::arg("wait") = true);
-  m.def(
-      "_xla_step_marker",
-      [](const std::string& device, const std::vector<std::string>& devices,
-         bool wait) {
-        NoGilSection nogil;
-        StepMarker(device, devices, wait);
-      },
-      py::arg("device") = "", py::arg("devices"), py::arg("wait") = true);
-  m.def(
-      "_xla_wait_device_ops",
-      [](const std::vector<std::string>& devices) {
-        NoGilSection nogil;
-        XLATensor::WaitDeviceOps(devices);
-      },
-      py::arg("devices"));
+  m.def("_xla_set_rng_seed",
+        [](uint64_t seed, const std::string& device) {
+          SetRngSeed(seed, device);
+        },
+        py::arg("seed") = 101, py::arg("device") = "");
+  m.def("_xla_get_rng_seed",
+        [](const std::string& device) { return GetRngSeed(device); },
+        py::arg("device") = "");
+  m.def("_xla_sync_multi",
+        [](const std::vector<at::Tensor>& tensors,
+           const std::vector<std::string>& devices, bool wait,
+           bool sync_xla_data) {
+          NoGilSection nogil;
+          SyncTensors(tensors, devices, wait, sync_xla_data);
+        },
+        py::arg("tensors"), py::arg("devices"), py::arg("wait") = true,
+        py::arg("sync_xla_data") = true);
+  m.def("_xla_sync_live_tensors",
+        [](const std::string& device, const std::vector<std::string>& devices,
+           bool wait) {
+          NoGilSection nogil;
+          SyncLiveTensors(device, devices, wait);
+        },
+        py::arg("device") = "", py::arg("devices"), py::arg("wait") = true);
+  m.def("_xla_step_marker",
+        [](const std::string& device, const std::vector<std::string>& devices,
+           bool wait) {
+          NoGilSection nogil;
+          StepMarker(device, devices, wait);
+        },
+        py::arg("device") = "", py::arg("devices"), py::arg("wait") = true);
+  m.def("_xla_wait_device_ops",
+        [](const std::vector<std::string>& devices) {
+          NoGilSection nogil;
+          XLATensor::WaitDeviceOps(devices);
+        },
+        py::arg("devices"));
   m.def("_xla_counter_names", []() { return xla::metrics::GetCounterNames(); });
   m.def("_xla_counter_value", [](const std::string& name) -> py::object {
     xla::metrics::CounterData* data = xla::metrics::GetCounter(name);
@@ -1170,35 +1164,32 @@ void InitXlaModuleBindings(py::module m) {
   });
   m.def("_xla_metrics_report",
         []() { return xla::metrics_reader::CreateMetricReport(); });
-  m.def(
-      "_xla_tensors_report",
-      [](size_t nodes_threshold, const std::string& device) {
-        return GetLiveTensorsReport(nodes_threshold, device);
-      },
-      py::arg("nodes_threshold") = 100, py::arg("device") = "");
+  m.def("_xla_tensors_report",
+        [](size_t nodes_threshold, const std::string& device) {
+          return GetLiveTensorsReport(nodes_threshold, device);
+        },
+        py::arg("nodes_threshold") = 100, py::arg("device") = "");
   m.def("_xla_memory_info", [](const std::string& device) -> py::object {
     return GetMemoryInfo(device);
   });
-  m.def(
-      "_xla_set_use_full_mat_mul_precision",
-      [](bool use_full_mat_mul_precision) {
-        XlaHelpers::set_mat_mul_precision(use_full_mat_mul_precision
-                                              ? xla::PrecisionConfig::HIGHEST
-                                              : xla::PrecisionConfig::DEFAULT);
-      },
-      py::arg("use_full_mat_mul_precision") = true);
+  m.def("_xla_set_use_full_mat_mul_precision",
+        [](bool use_full_mat_mul_precision) {
+          XlaHelpers::set_mat_mul_precision(
+              use_full_mat_mul_precision ? xla::PrecisionConfig::HIGHEST
+                                         : xla::PrecisionConfig::DEFAULT);
+        },
+        py::arg("use_full_mat_mul_precision") = true);
 
   py::class_<xla::util::RecordReader, std::shared_ptr<xla::util::RecordReader>>(
       m, "RecordReader");
-  m.def(
-      "_xla_create_tfrecord_reader",
-      [](const std::string& path, const std::string& compression,
-         int64_t buffer_size) {
-        NoGilSection nogil;
-        return CreateRecordReader(path, compression, buffer_size);
-      },
-      py::arg("path"), py::arg("compression") = "",
-      py::arg("buffer_size") = 16 * 1024 * 1024);
+  m.def("_xla_create_tfrecord_reader",
+        [](const std::string& path, const std::string& compression,
+           int64_t buffer_size) {
+          NoGilSection nogil;
+          return CreateRecordReader(path, compression, buffer_size);
+        },
+        py::arg("path"), py::arg("compression") = "",
+        py::arg("buffer_size") = 16 * 1024 * 1024);
   m.def(
       "_xla_tfrecord_read",
       [](const std::shared_ptr<xla::util::RecordReader>& reader) -> py::object {
@@ -1408,13 +1399,6 @@ void InitXlaModuleBindings(py::module m) {
     }
 
     XLATensor xtensor = bridge::GetXlaTensor(input);
-    // Assign an IR node representing this tensor if not already present,
-    // which could be the case if the tensor is created but never touched, yet.
-    xtensor.GetIrValue();
-    XLA_CHECK(xtensor.GetIrValue())
-        << "XLATensor is yet to be assigned an IR node.";
-    XLA_CHECK(xtensor.CurrentIrValue().node != nullptr)
-        << "IR value node is null.";
     xtensor.SetShardingSpec(sharding, replicated, manual);
   });
   m.def("_xla_clear_sharding", [](const at::Tensor& input) {
@@ -1460,60 +1444,6 @@ void InitXlaModuleBindings(py::module m) {
           }
           auto module = std::move(hlo_module_error.ValueOrDie());
 
-          xla::HloPassPipeline pass("spmd-partitioning");
-          pass.AddPass<xla::HloVerifier>(/*layout_sensitive=*/false,
-                                         /*allow_mixed_precision=*/false);
-          pass.AddPass<xla::ShardingPropagation>(/*is_spmd=*/true);
-          pass.AddPass<xla::spmd::SpmdPartitioner>(
-              /*num_partitions=*/num_devices,
-              /*num_replicas=*/num_replicas, options);
-          pass.AddPass<xla::HloVerifier>(/*layout_sensitive=*/false,
-                                         /*allow_mixed_precision=*/false);
-          pass.Run(module.get());
-          return module->ToString();
-        });
-  m.def("_xla_get_sharding_spec", [](const at::Tensor& input) {
-    // TODO: fix this
-    XLATensor xtensor = bridge::GetXlaTensor(input);
-    auto sharding_spec = xtensor.sharding_spec();
-    auto hlo_sharding = xla::HloSharding::FromProto(sharding_spec->sharding);
-    return hlo_sharding->ToString();
-  });
-
-  m.def("_init_xla_lazy_backend", []() {
-    MapXlaEnvVarsToLazy();
-    InitXlaBackend();
-  });
-  m.def("_get_xla_tensors_hlo_with_sharding",
-        [](const std::vector<at::Tensor>& tensors, int64_t num_replicas,
-           int64_t num_devices, bool conv_halo_exchange_always_on_lhs = true,
-           bool choose_faster_windowed_einsum = false,
-           bool unroll_windowed_einsum = false,
-           bool bidirectional_windowed_einsum = false) -> std::string {
-          xla::spmd::SpmdPartitionerOptions options;
-          options.conv_halo_exchange_always_on_lhs =
-              conv_halo_exchange_always_on_lhs;
-          options.allow_module_signature_change = true;
-          options.choose_faster_windowed_einsum_over_mem =
-              choose_faster_windowed_einsum;
-          options.unroll_windowed_einsum = unroll_windowed_einsum;
-          options.bidirectional_windowed_einsum = bidirectional_windowed_einsum;
-
-          xla::HloModuleConfig config;
-          config.set_use_spmd_partitioning(true);
-          config.set_replica_count(num_replicas);
-          config.set_num_partitions(num_devices);
-
-          auto hlo_text = GetTensorsHloGraph(tensors);
-          auto hlo_module_error =
-              xla::ParseAndReturnUnverifiedModule(hlo_text, config);
-          if (!hlo_module_error.ok()) {
-            LOG(ERROR) << "HLO Module loading failed: "
-                       << hlo_module_error.status();
-            return nullptr;
-          }
-          auto module = std::move(hlo_module_error.ValueOrDie());
-
           auto collective_ops_creator =
               xla::spmd::GetDefaultCollectiveOpsCreator(
                   num_devices, /*num_replicas=*/num_replicas);
@@ -1530,6 +1460,11 @@ void InitXlaModuleBindings(py::module m) {
           pass.Run(module.get());
           return module->ToString();
         });
+
+  m.def("_init_xla_lazy_backend", []() {
+    MapXlaEnvVarsToLazy();
+    InitXlaBackend();
+  });
 
   BuildProfilerSubmodule(&m);
 }

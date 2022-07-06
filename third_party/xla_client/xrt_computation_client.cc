@@ -1760,7 +1760,7 @@ void XrtComputationClient::InitSession(XrtSession* session) const {
   struct InitNode {
     int count;
     const XrtSession::CachedNode& (XrtComputationClient::*node_ctor)(
-        XrtSession*, const tensorflow::Scope&, const std::string&) const;
+        XrtSession*, const tensorflow::Scope&, const std::string&)const;
   } const init_nodes[] = {
       {16, &XrtComputationClient::GetCompileNode},
       {16, &XrtComputationClient::GetExecuteNode},
