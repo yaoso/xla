@@ -184,6 +184,11 @@ PjRtComputationClient::ExecuteComputation(
 
     std::vector<std::string> devices = GetAllDevices();
 
+    // TODO(yeounoh):
+    // - Avoid the data pre-loading in case of SPMD
+    // - Shard input (input handler)
+    // - Execute replicated mode
+    // - Return outputs (output handler)
     std::vector<std::vector<PjRtBuffer*>> argument_handles;
     for (auto& device : devices) {
       xla::PjRtDevice* pjrt_device = StringToPjRtDevice(device);
