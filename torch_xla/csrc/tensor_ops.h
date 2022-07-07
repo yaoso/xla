@@ -13,10 +13,6 @@ namespace tensor_ops {
 XLATensor Cross(const XLATensor& input, const XLATensor& other,
                 c10::optional<int64_t> dim);
 
-XLATensor KlDivBackward(const XLATensor& grad_output, const XLATensor& input,
-                        const XLATensor& target, ReductionMode reduction,
-                        bool log_target);
-
 XLATensor MakeMatrixWithDiagonal(const XLATensor& input, int64_t diagonal);
 
 XLATensor SmoothL1Loss(const XLATensor& input, const XLATensor& target,

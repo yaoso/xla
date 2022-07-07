@@ -663,11 +663,6 @@ class XLATensor : public c10::intrusive_ptr_target {
 
   static XLATensor isnan(const XLATensor& input);
 
-  static XLATensor kl_div_backward(const XLATensor& grad_output,
-                                   const XLATensor& input,
-                                   const XLATensor& target, int64_t reduction,
-                                   bool log_target);
-
   static std::tuple<XLATensor, XLATensor> kthvalue(const XLATensor& input,
                                                    int64_t k, int64_t dim,
                                                    bool keepdim);
